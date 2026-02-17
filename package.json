@@ -1,6 +1,6 @@
 {
   "name": "@miner-org/mineflayer-physics-reworked",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "scripts": {
     "npm-publish-patch": "npm version patch && npm publish --access public && git push origin main --tags",
     "npm-publish-minor": "npm version minor && npm publish --access public && git push origin main --tags",
