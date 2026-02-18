@@ -224,9 +224,10 @@ class PhysicsEngine {
   /**
    * Get all block bounding boxes surrounding a query bounding box
    */
-  getSurroundingBBs(queryBB) {
+  getSurroundingBBs(queryBB, playerMinY = null, descendScaffolding = false) {
     const surroundingBBs = [];
     const cursor = new Vec3(0, 0, 0);
+    const feetY = playerMinY !== null ? playerMinY : queryBB.minY;
 
     for (
       cursor.y = Math.floor(queryBB.minY) - 1;
@@ -246,15 +247,50 @@ class PhysicsEngine {
           const block = this.world.getBlock(cursor);
           if (block) {
             const blockPos = block.position;
-            // Scaffolding: skip all shapes entirely — fully passable horizontally.
-            // Vertical standing is handled by injecting a thin floor BB directly.
+            // Scaffolding: fully passable horizontally (no X/Z shapes).
+            // Two possible vertical collision surfaces:
+            //
+            // 1) TOP surface (y+1): always solid — standing on top lands at blockPos.y+1
+            //    exactly like any full block. Suppressed only when the block directly
+            //    above is also scaffolding (you climb up through a stack).
+            //
+            // 2) BOTTOM floor (y+0.125): only when bottom=true (unsupported scaffolding).
+            //    This is a partial floor inside the block — if you enter from below
+            //    your feet stop at blockPos.y+0.125. Always injected regardless of
+            //    what is above, because it only affects upward movement from inside.
             if (block.type === this.specialBlocks.scaffolding) {
               const isBottom = block.getProperties().bottom;
-              // bottom=true (no support block) has floor at 0.125, bottom=false at 0
-              const floorY = isBottom ? 0.125 : 0;
-              const floorBB = new AABB(0, floorY, 0, 1, floorY + 0.01, 1);
-              floorBB.offset(blockPos.x, blockPos.y, blockPos.z);
-              surroundingBBs.push(floorBB);
+              const isBelowPlayer = cursor.y < Math.floor(feetY);
+
+              if (isBelowPlayer) {
+                // Player is standing on or being supported by this scaffolding.
+                // Always use real block.shapes
+                // Exception: if player is actively sneaking to descend, suppress
+                // the top surface so they can pass through downward.
+                if (!descendScaffolding) {
+                  for (const shape of block.shapes) {
+                    const blockBB = new AABB(
+                      shape[0],
+                      shape[1],
+                      shape[2],
+                      shape[3],
+                      shape[4],
+                      shape[5],
+                    );
+                    blockBB.offset(blockPos.x, blockPos.y, blockPos.z);
+                    surroundingBBs.push(blockBB);
+                  }
+                }
+              } else {
+                // Player is inside the scaffolding block — passable horizontally.
+                // Only add the inner floor for bottom=true (partial floor at y+0.125).
+                if (isBottom) {
+                  const innerBB = new AABB(0, 0.115, 0, 1, 0.125, 1);
+                  innerBB.offset(blockPos.x, blockPos.y, blockPos.z);
+                  surroundingBBs.push(innerBB);
+                }
+              }
+
               continue;
             }
             for (const shape of block.shapes) {
@@ -369,7 +405,11 @@ class PhysicsEngine {
     // Collision detection — use correct hitbox for current pose
     let playerBB = this.getPlayerBB(pos, isCrawling, isSneaking);
     const queryBB = playerBB.clone().extend(dx, dy, dz);
-    const surroundingBBs = this.getSurroundingBBs(queryBB);
+    const surroundingBBs = this.getSurroundingBBs(
+      queryBB,
+      playerBB.minY,
+      entity._descendScaffolding,
+    );
     const oldBB = playerBB.clone();
 
     for (const blockBB of surroundingBBs) {
@@ -401,7 +441,7 @@ class PhysicsEngine {
 
       dy = this.constants.stepHeight;
       const queryBB = oldBB.clone().extend(oldVelX, dy, oldVelZ);
-      const surroundingBBs = this.getSurroundingBBs(queryBB);
+      const surroundingBBs = this.getSurroundingBBs(queryBB, oldBB.minY);
 
       const BB1 = oldBB.clone();
       const BB2 = oldBB.clone();
@@ -636,12 +676,19 @@ class PhysicsEngine {
   }
 
   /**
-   * Check if inside scaffolding (not standing on top)
+   * Check if inside or standing on top of scaffolding
    */
-  _isOnScaffolding(pos) {
+  _isOnScaffolding(pos, onGround = false) {
     if (this.specialBlocks.scaffolding === -1) return false;
+    // Inside the scaffolding block (climbing)
     const block = this.world.getBlock(pos);
-    return block?.type === this.specialBlocks.scaffolding;
+    if (block?.type === this.specialBlocks.scaffolding) return true;
+    // Standing on top: feet are at blockPos.y+1 so check the block below
+    if (onGround) {
+      const blockBelow = this.world.getBlock(pos.offset(0, -1, 0));
+      if (blockBelow?.type === this.specialBlocks.scaffolding) return true;
+    }
+    return false;
   }
 
   /**
@@ -1052,7 +1099,8 @@ class PhysicsEngine {
       }
 
       // Scaffolding: sneak to descend, jump to ascend, otherwise slow fall
-      if (this._isOnScaffolding(pos)) {
+      const onScaffolding = this._isOnScaffolding(pos, entity.onGround);
+      if (onScaffolding) {
         vel.x = clamp(
           -this.constants.ladderMaxSpeed,
           vel.x,
@@ -1074,6 +1122,10 @@ class PhysicsEngine {
           vel.y = Math.max(vel.y, -this.constants.scaffoldingClimbSpeed);
         }
       }
+
+      // Flag for getSurroundingBBs: suppress scaffolding top surface so player
+      // can descend through it when sneaking on top.
+      entity._descendScaffolding = onScaffolding && entity.control.sneak;
 
       this._moveEntityCollision(entity, vel.x, vel.y, vel.z);
 
@@ -1321,7 +1373,6 @@ class PlayerState {
   }
 }
 
-// Helper functions
 function getEffectLevel(mcData, effectName, effects) {
   const effectDescriptor = mcData.effectsByName[effectName];
   if (!effectDescriptor) return 0;

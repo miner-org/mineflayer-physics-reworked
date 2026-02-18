@@ -10,7 +10,7 @@ interface ControlState {
 }
 
 declare module "@miner-org/mineflayer-physics-reworked" {
-  export function inject(bot: Bot): void;
+  export default function inject(bot: Bot): void;
 }
 
 declare module "mineflayer" {
