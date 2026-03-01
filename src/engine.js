@@ -335,7 +335,8 @@ class PhysicsEngine {
     const vel = entity.vel;
     const pos = entity.pos;
     const isCrawling = entity.isCrawling;
-    const isSneaking = entity.control.sneak && !isCrawling;
+    const isSneaking =
+      (entity.control.sneak && !isCrawling) || entity.trueSneaking;
 
     // Handle cobweb slowdown
     if (entity.isInWeb) {
@@ -874,7 +875,8 @@ class PhysicsEngine {
     const vel = entity.vel;
     const pos = entity.pos;
     const isCrawling = entity.isCrawling;
-    const isSneaking = entity.control.sneak && !isCrawling;
+    const isSneaking =
+      (entity.control.sneak && !isCrawling) || entity.trueSneaking;
 
     const gravityMultiplier =
       vel.y <= 0 && entity.slowFalling > 0 ? this.constants.slowFalling : 1;
@@ -1156,7 +1158,8 @@ class PhysicsEngine {
     const vel = entity.vel;
     const pos = entity.pos;
     const isCrawling = entity.isCrawling;
-    const isSneaking = entity.control.sneak && !isCrawling;
+    const isSneaking =
+      (entity.control.sneak && !isCrawling) || entity.trueSneaking;
 
     // Swimming uses crawl hitbox (0.6 height horizontal)
     const isSwimming = entity.isSwimmingPose && entity.isInWater;
@@ -1290,6 +1293,7 @@ class PlayerState {
     // Crawling / pose state from server-confirmed metadata
     this.isCrawling = bot.entity.isCrawling ?? false;
     this.isSwimmingPose = bot.entity.isSwimmingPose ?? false;
+    this.trueSneaking = bot.entity.serverSideSneaking ?? false;
 
     // Jump state
     this.jumpTicks = bot.jumpTicks;

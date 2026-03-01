@@ -378,6 +378,7 @@ function inject(bot) {
         entity._pose = metas.pose;
         entity.isElytra = metas.pose === 1;
         entity.isSwimmingPose = metas.pose === 3;
+        entity.serverSideSneaking = metas.pose === 5;
         // Crawling is swimming pose but not in water
         entity.isCrawling = metas.pose === 3 && !entity.isInWater;
 
@@ -386,6 +387,7 @@ function inject(bot) {
           crawling: entity.isCrawling,
           swimming: entity.isSwimmingPose && entity.isInWater,
           elytra: entity.isElytra,
+          trueSneaking: entity.serverSideSneaking,
         });
       }
     }
