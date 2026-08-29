@@ -1,4 +1,4 @@
-import { PhysicsEngine } from "./src/engine";
+import { PhysicsEngine, PlayerState } from "./src/engine";
 
 interface ControlState {
   forward: boolean;
@@ -10,19 +10,13 @@ interface ControlState {
 }
 
 declare module "@miner-org/mineflayer-physics-reworked" {
-  export default function inject(bot: Bot): void;
+  PhysicsEngine;
+  PlayerState;
 }
 
 declare module "mineflayer" {
   interface Bot {
-    ashPhysics: PhysicsEngine;
-    ashPhysicsEnabled: boolean;
-    ashControlState: ControlState;
-    ashGetControlState(): ControlState;
-    ashClearControlStates(): void;
-    ashSetControlState(
-      control: "forward" | "back" | "left" | "right" | "jump" | "sneak",
-      value: boolean,
-    ): void;
+    physics: PhysicsEngine;
+    physicsEnabled: boolean;
   }
 }

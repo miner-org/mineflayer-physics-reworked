@@ -12,7 +12,5 @@
   "author": "Ash",
   "license": "ISC",
   "description": "Mineflayer physics but with extra stuff like crawling support and scaffolding support",
-  "dependencies": {
-    "mineflayer": "^4.25.0"
-  }
+  "dependencies": {}
 }
